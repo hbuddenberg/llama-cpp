@@ -1,0 +1,5 @@
+# Independent git repositories — each has its own history and remote
+nuc-infra/
+ai-wrapper/
+llama-atomic/
+llama-tom/
