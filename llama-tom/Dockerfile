@@ -21,6 +21,7 @@ RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/li
 RUN rm -rf /src/tools/ui /src/scripts/ui-assets.cmake && \
     sed -i '/add_subdirectory.*\bui\b/Id' /src/tools/CMakeLists.txt && \
     find /src -name "CMakeLists.txt" -exec sed -i '/ui-assets/d' {} \; && \
+    sed -i 's/ llama-ui//' /src/tools/server/CMakeLists.txt && \
     cat > /src/tools/server/ui.h << 'EOF'
 #pragma once
 #include <cstddef>
