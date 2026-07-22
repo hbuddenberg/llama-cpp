@@ -5,7 +5,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 # Pin to a commit SHA for reproducible builds: --build-arg SOURCE_REF=<sha>
 # (fetch-by-ref works for branches, tags and arbitrary SHAs, unlike a shallow clone + checkout)
-ARG SOURCE_REF=main
+ARG SOURCE_REF=master
 WORKDIR /src
 RUN git init -q . \
     && git remote add origin https://github.com/AtomicBot-ai/atomic-llama-cpp-turboquant.git \
