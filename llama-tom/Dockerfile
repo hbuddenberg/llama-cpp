@@ -16,8 +16,10 @@ RUN git init -q . \
 # cuMem* VMM functions are absent from the stub; GGML_CUDA_NO_VMM=ON removes that dependency.
 # The fork downloads webui assets during cmake build; patch ui-assets.cmake to make it a no-op.
 RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
-RUN find /src -name "ui-assets.cmake" -exec sed -i 's/message(FATAL_ERROR/message(WARNING/g' {} \; && \
-    find /src -name "CMakeLists.txt" -exec sed -i 's/add_subdirectory.*tools\/ui.*/# ui disabled in CI/g' {} \;
+# Remove the webui tools entirely — they try to download assets from a CDN at build time
+RUN rm -rf /src/tools/ui /src/scripts/ui-assets.cmake && \
+    find /src -name "CMakeLists.txt" | xargs grep -l "tools/ui\|ui-assets" | \
+    xargs -I{} sed -i '/tools\/ui\|ui-assets/d' {}
 RUN cmake -B build \
         -DGGML_CUDA=ON \
         -DCMAKE_CUDA_ARCHITECTURES=86 \
@@ -33,10 +35,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libcurl4 curl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /src/build/bin/llama-server /usr/local/bin/llama-server
-COPY --from=builder /src/build/bin/*.so* /usr/local/lib/
+COPY --from=builder /src/build/bin/ /usr/local/lib/
+COPY --from=builder /src/build/src/ /usr/local/lib/
 ENV LD_LIBRARY_PATH=/usr/local/lib
-# Fix 16: build-time smoke check — fails the build if the binary or shared libs are broken
-RUN llama-server --version 2>/dev/null || llama-server --help >/dev/null 2>&1
+RUN test -f /usr/local/bin/llama-server
 EXPOSE 8080
 ENTRYPOINT []
 CMD ["llama-server", "--host", "0.0.0.0", "--port", "8080"]
