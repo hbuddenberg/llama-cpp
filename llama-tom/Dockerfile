@@ -16,10 +16,13 @@ RUN git init -q . \
 # cuMem* VMM functions are absent from the stub; GGML_CUDA_NO_VMM=ON removes that dependency.
 # The fork downloads webui assets during cmake build; patch ui-assets.cmake to make it a no-op.
 RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
-# Remove the webui tools entirely — they try to download assets from a CDN at build time
+# The webui tries to download assets from a CDN at build time — remove it.
+# server-http.cpp still #includes ui.h, so provide a stub that satisfies the compiler.
 RUN rm -rf /src/tools/ui /src/scripts/ui-assets.cmake && \
-    sed -i '/add_subdirectory.*ui\b/Id' /src/tools/CMakeLists.txt && \
-    find /src -name "CMakeLists.txt" -exec sed -i '/ui-assets/d' {} \;
+    sed -i '/add_subdirectory.*\bui\b/Id' /src/tools/CMakeLists.txt && \
+    find /src -name "CMakeLists.txt" -exec sed -i '/ui-assets/d' {} \; && \
+    printf '#pragma once\n#include <cstddef>\nstatic const unsigned char LLAMA_SERVER_WEBUI[] = {0};\nstatic const std::size_t LLAMA_SERVER_WEBUI_SIZE = 0;\n' \
+        > /src/tools/server/ui.h
 RUN cmake -B build \
         -DGGML_CUDA=ON \
         -DCMAKE_CUDA_ARCHITECTURES=86 \
