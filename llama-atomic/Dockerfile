@@ -12,12 +12,16 @@ RUN git init -q . \
     && git fetch --depth 1 origin "$SOURCE_REF" \
     && git checkout -q FETCH_HEAD \
     && git submodule update --init --recursive --depth 1
-# libcuda.so is a stub in the devel image — create the .so.1 symlink so the linker resolves cuGetErrorString
+# CI runners have no GPU driver — use the CUDA stub library for linking.
+# cuMem* VMM functions are absent from the stub; GGML_CUDA_NO_VMM=ON removes that dependency.
 RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
-RUN cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86 \
+RUN cmake -B build \
+        -DGGML_CUDA=ON \
+        -DCMAKE_CUDA_ARCHITECTURES=86 \
+        -DGGML_CUDA_NO_VMM=ON \
         -DLLAMA_SERVER_WEBUI=OFF \
-        -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs" \
-        -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs" \
+        -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
+        -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
     && cmake --build build --config Release --target llama-server -j"$(nproc)"
 
 # Stage 2: minimal runtime
