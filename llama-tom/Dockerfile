@@ -21,8 +21,28 @@ RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/li
 RUN rm -rf /src/tools/ui /src/scripts/ui-assets.cmake && \
     sed -i '/add_subdirectory.*\bui\b/Id' /src/tools/CMakeLists.txt && \
     find /src -name "CMakeLists.txt" -exec sed -i '/ui-assets/d' {} \; && \
-    printf '#pragma once\n#include <cstddef>\nstatic const unsigned char LLAMA_SERVER_WEBUI[] = {0};\nstatic const std::size_t LLAMA_SERVER_WEBUI_SIZE = 0;\n' \
-        > /src/tools/server/ui.h
+    cat > /src/tools/server/ui.h << 'EOF'
+#pragma once
+#include <cstddef>
+#include <string>
+#include <vector>
+
+// Stub ui.h — no web UI assets (disabled in CI build)
+// LLAMA_UI_HAS_ASSETS is intentionally NOT defined so the asset-serving
+// block in server-http.cpp is excluded at compile time.
+
+struct llama_ui_asset {
+    std::string          name;
+    std::string          etag;
+    std::string          type;
+    const unsigned char* data;
+    std::size_t          size;
+};
+
+inline std::vector<llama_ui_asset> llama_ui_get_assets() { return {}; }
+inline const llama_ui_asset*       llama_ui_find_asset(const std::string &) { return nullptr; }
+inline bool                        llama_ui_use_gzip()   { return false; }
+EOF
 RUN cmake -B build \
         -DGGML_CUDA=ON \
         -DCMAKE_CUDA_ARCHITECTURES=86 \
