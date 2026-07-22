@@ -18,8 +18,8 @@ RUN git init -q . \
 RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
 # Remove the webui tools entirely — they try to download assets from a CDN at build time
 RUN rm -rf /src/tools/ui /src/scripts/ui-assets.cmake && \
-    find /src -name "CMakeLists.txt" | xargs grep -l "tools/ui\|ui-assets" | \
-    xargs -I{} sed -i '/tools\/ui\|ui-assets/d' {}
+    sed -i '/add_subdirectory.*ui\b/Id' /src/tools/CMakeLists.txt && \
+    find /src -name "CMakeLists.txt" -exec sed -i '/ui-assets/d' {} \;
 RUN cmake -B build \
         -DGGML_CUDA=ON \
         -DCMAKE_CUDA_ARCHITECTURES=86 \
