@@ -1,0 +1,103 @@
+# Fix 12: removed obsolete version: key
+
+networks:
+  ai-isolated-net:
+    driver: bridge
+
+services:
+  librechat:
+    image: ghcr.io/danny-avila/librechat:latest
+    container_name: librechat
+    restart: unless-stopped
+    ports:
+      - "3000:3080"
+    environment:
+      - HOST=0.0.0.0
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - RAG_API_URL=http://rag-api:8000
+      - ENDPOINTS=custom
+    env_file:
+      - .env
+    volumes:
+      - ./config/librechat.yaml:/app/librechat.yaml:z
+    depends_on:
+      - mongodb
+      - rag-api
+      - ai-wrapper
+    networks:
+      - ai-isolated-net
+
+  mongodb:
+    # Pinned major version: keeps the mongosh healthcheck and memory behavior stable
+    image: mongo:8
+    container_name: mongodb
+    restart: unless-stopped
+    # Cap WiredTiger cache to keep MongoDB near 250MB RAM
+    command: mongod --wiredTigerCacheSizeGB 0.25
+    volumes:
+      - ./data/mongodb:/data/db:z
+    networks:
+      - ai-isolated-net
+    # Fix 12: healthcheck for mongodb
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand(\"ping\")' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  rag-api:
+    image: ghcr.io/danny-avila/librechat-rag-api:latest
+    container_name: rag-api
+    restart: unless-stopped
+    environment:
+      # Embeddings run exclusively on the host CPU
+      - VECTOR_DB=qdrant
+      - QDRANT_URL=http://qdrant-db:6333
+      - EMBEDDINGS_PROVIDER=local
+      - EMBEDDINGS_MODEL=all-MiniLM-L6-v2
+    depends_on:
+      - qdrant-db
+    networks:
+      - ai-isolated-net
+
+  qdrant-db:
+    image: qdrant/qdrant:latest
+    container_name: qdrant-db
+    restart: unless-stopped
+    volumes:
+      - ./data/qdrant:/qdrant/storage:z
+    networks:
+      - ai-isolated-net
+    # No healthcheck: the qdrant image ships no shell/wget/curl to probe with.
+    # rag-api retries its connection on startup, which covers the boot race.
+
+  ai-wrapper:
+    image: ghcr.io/${GH_USER}/ai-wrapper:latest
+    container_name: ai-wrapper
+    restart: unless-stopped
+    # Single OpenAI-compatible endpoint for the whole appliance
+    ports:
+      - "5120:8000"
+    environment:
+      - WRAPPER_API_KEY=${WRAPPER_API_KEY}
+      # Fix 12: ALLOW_ANONYMOUS passthrough (default unset — wrapper refuses to start open)
+      - ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-}
+      - PODMAN_URL=unix:///run/podman/podman.sock
+      - MODELS_DIR=/models
+      - MODELS_HOST_DIR=${MODELS_HOST_DIR}
+      - ENGINE_NETWORK=nuc-infra_ai-isolated-net
+      - GH_USER=${GH_USER}
+    volumes:
+      # Fix 12: plain mount, no :z — do not SELinux-relabel a socket
+      - /run/user/1000/podman/podman.sock:/run/podman/podman.sock
+      - ./data/models:/models:ro,z
+    networks:
+      - ai-isolated-net
+
+# NOTE: the inference engines (llama-atomic / llama-tom) are NOT compose
+# services. ai-wrapper launches them on demand via the host Podman socket
+# (podman run --device nvidia.com/gpu=all) using each model's config.toml,
+# guaranteeing that only one engine ever holds the GPU. Pull the images once:
+#   podman pull ghcr.io/${GH_USER}/llama-atomic:latest
+#   podman pull ghcr.io/${GH_USER}/llama-tom:latest

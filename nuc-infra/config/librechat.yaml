@@ -1,0 +1,18 @@
+version: 1.2.1
+
+cache: true
+
+endpoints:
+  custom:
+    - name: "NUC Llama"
+      apiKey: "${WRAPPER_API_KEY}"
+      baseURL: "http://ai-wrapper:8000/v1"
+      models:
+        default:
+          - "qwen-32b-speed"
+          - "llama-3-long-context"
+        fetch: true
+      titleConvo: true
+      titleModel: "qwen-32b-speed"
+      modelDisplayLabel: "NUC Llama"
+      forcePrompt: false

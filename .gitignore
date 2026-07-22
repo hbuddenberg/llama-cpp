@@ -1,5 +1,7 @@
-# Independent git repositories — each has its own history and remote
-nuc-infra/
-ai-wrapper/
-llama-atomic/
-llama-tom/
+__pycache__/
+*.pyc
+*.pyo
+.env
+data/mongodb/
+data/qdrant/
+data/models/
